@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Chat App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chat-bubble-me { background-color: #3b82f6; color: white; }
+        .chat-bubble-other { background-color: #e5e7eb; color: #1f2937; }
+        #chat-messages::-webkit-scrollbar { width: 8px; }
+        #chat-messages::-webkit-scrollbar-track { background: #f1f5f9; }
+        #chat-messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        #chat-messages::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gray-100 antialiased">
+
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="flex items-center justify-center h-screen">
+        <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm text-center">
+            <h1 class="text-2xl font-bold mb-2 text-gray-800">Welcome to ChatApp</h1>
+            <p class="text-gray-600 mb-6">Enter your name to start chatting.</p>
+            <form id="auth-form">
+                <input type="text" id="display-name" placeholder="Your Display Name" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                <button type="submit" class="w-full bg-blue-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-600 transition duration-300 mt-4">
+                    Join Chat
+                </button>
+            </form>
+            <p id="auth-error" class="text-red-500 text-sm mt-4"></p>
+        </div>
+    </div>
+
+    <!-- Main Chat Screen -->
+    <div id="chat-screen" class="hidden h-screen w-screen grid grid-cols-12">
+        <!-- Left Sidebar: Rooms & User Info -->
+        <aside class="col-span-12 md:col-span-3 lg:col-span-2 bg-gray-800 text-gray-200 flex flex-col">
+            <div class="p-4 border-b border-gray-700">
+                <h2 class="text-xl font-bold text-white">Chat Rooms</h2>
+            </div>
+            <div id="rooms-list" class="flex-grow overflow-y-auto p-2">
+                <!-- Room items will be injected here -->
+            </div>
+            <form id="new-room-form" class="p-4 border-t border-gray-700 flex items-center space-x-2">
+                <input type="text" id="new-room-name" placeholder="New Room Name" class="flex-grow bg-gray-700 text-white px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 p-2 rounded-md transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                </button>
+            </form>
+            <div id="user-info" class="p-4 border-t border-gray-700 flex items-center space-x-3">
+                 <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white text-xl" id="user-avatar"></div>
+                 <div>
+                    <p class="font-semibold text-white" id="user-display-name"></p>
+                    <button id="logout-btn" class="text-xs text-red-400 hover:underline">Logout</button>
+                 </div>
+            </div>
+        </aside>
+
+        <!-- Center: Chat Area -->
+        <main class="col-span-12 md:col-span-6 lg:col-span-7 bg-white flex flex-col h-screen">
+            <header id="chat-header" class="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-800">#general</h2>
+                <div id="online-users-count" class="text-sm text-gray-500"></div>
+            </header>
+            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
+                <!-- Messages will be injected here -->
+            </div>
+            <div id="typing-indicator" class="px-4 pb-2 text-sm text-gray-500 h-6"></div>
+            <footer class="p-4 bg-gray-50 border-t border-gray-200">
+                <form id="message-form" class="flex items-center space-x-3">
+                    <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" class="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button type="submit" class="bg-blue-500 text-white font-semibold py-2 px-4 rounded-full hover:bg-blue-600 transition duration-300">
+                        Send
+                    </button>
+                </form>
+            </footer>
+        </main>
+
+        <!-- Right Sidebar: Online Users -->
+        <aside class="hidden md:block md:col-span-3 lg:col-span-3 bg-gray-50 border-l border-gray-200 flex-col">
+            <div class="p-4 border-b border-gray-200">
+                <h2 class="text-xl font-bold text-gray-800">Online Users</h2>
+            </div>
+            <div id="online-users-list" class="flex-grow overflow-y-auto p-4 space-y-3">
+                <!-- Online users will be injected here -->
+            </div>
+        </aside>
+    </div>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        // --- Firebase Configuration ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-chat-app';
+
+        // --- Firebase Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy, arrayUnion, arrayRemove, updateDoc, deleteDoc
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getDatabase, ref, onValue, set, onDisconnect } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        // --- Firebase Initialization ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const rtdb = getDatabase(app);
+
+        // --- DOM Elements ---
+        const authScreen = document.getElementById('auth-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const authForm = document.getElementById('auth-form');
+        const displayNameInput = document.getElementById('display-name');
+        const authError = document.getElementById('auth-error');
+        
+        const roomsList = document.getElementById('rooms-list');
+        const newRoomForm = document.getElementById('new-room-form');
+        const newRoomNameInput = document.getElementById('new-room-name');
+        
+        const userInfo = document.getElementById('user-info');
+        const userAvatar = document.getElementById('user-avatar');
+        const userDisplayName = document.getElementById('user-display-name');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        const chatHeader = document.getElementById('chat-header');
+        const chatMessages = document.getElementById('chat-messages');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        
+        const onlineUsersCount = document.getElementById('online-users-count');
+        const onlineUsersList = document.getElementById('online-users-list');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        // --- App State ---
+        let currentUser = null;
+        let currentRoomId = 'general';
+        let unsubscribeMessages = () => {};
+        let unsubscribeRoomTyping = () => {};
+        let typingTimeout = null;
+
+        // --- Authentication ---
+        onAuthStateChanged(auth, user => {
+            if (user && user.displayName) {
+                currentUser = user;
+                setupPresence(user);
+                showChatUI(user);
+                loadApp();
+            } else {
+                currentUser = null;
+                showAuthUI();
+            }
+        });
+
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const displayName = displayNameInput.value.trim();
+            if (displayName.length < 3) {
+                authError.textContent = 'Name must be at least 3 characters.';
+                return;
+            }
+            authError.textContent = '';
+            try {
+                const userCredential = await signInAnonymously(auth);
+                await updateProfile(userCredential.user, { displayName });
+                // The onAuthStateChanged listener will handle the UI switch
+            } catch (error) {
+                console.error("Authentication Error:", error);
+                authError.textContent = 'Failed to sign in. Please try again.';
+            }
+        });
+        
+        logoutBtn.addEventListener('click', () => {
+             // Before signing out, remove user from typing indicators of all rooms if necessary
+            const roomRef = doc(db, 'rooms', currentRoomId);
+            updateDoc(roomRef, { typing: arrayRemove(currentUser.uid) });
+            signOut(auth);
+        });
+        
+        // --- UI Management ---
+        function showAuthUI() {
+            authScreen.classList.remove('hidden');
+            chatScreen.classList.add('hidden');
+        }
+
+        function showChatUI(user) {
+            userDisplayName.textContent = user.displayName;
+            userAvatar.textContent = user.displayName.charAt(0).toUpperCase();
+            authScreen.classList.add('hidden');
+            chatScreen.classList.remove('hidden');
+            chatScreen.classList.add('grid');
+        }
+
+        // --- Main App Logic ---
+        function loadApp() {
+            listenForRooms();
+            listenForOnlineUsers();
+            selectRoom('general'); // Default room
+        }
+
+        // --- Presence / Online Status (using RTDB for reliability) ---
+        function setupPresence(user) {
+            const userStatusDatabaseRef = ref(rtdb, `/status/${user.uid}`);
+            const isOfflineForDatabase = {
+                state: 'offline',
+                last_changed: serverTimestamp(),
+                displayName: user.displayName,
+            };
+            const isOnlineForDatabase = {
+                state: 'online',
+                last_changed: serverTimestamp(),
+                displayName: user.displayName,
+            };
+            
+            const connectedRef = ref(rtdb, '.info/connected');
+            onValue(connectedRef, (snap) => {
+                if (snap.val() === true) {
+                    set(userStatusDatabaseRef, isOnlineForDatabase);
+                    onDisconnect(userStatusDatabaseRef).set(isOfflineForDatabase);
+                }
+            });
+        }
+        
+        function listenForOnlineUsers() {
+            const statusRef = ref(rtdb, '/status');
+            onValue(statusRef, (snapshot) => {
+                const users = snapshot.val() || {};
+                const onlineUsers = Object.entries(users).filter(([, val]) => val.state === 'online');
+                
+                onlineUsersList.innerHTML = '';
+                onlineUsers.forEach(([uid, user]) => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'flex items-center space-x-3';
+                    userElement.innerHTML = `
+                        <div class="relative">
+                            <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center font-bold text-white text-xl">${user.displayName.charAt(0).toUpperCase()}</div>
+                            <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-400 ring-2 ring-white"></span>
+                        </div>
+                        <span class="text-gray-700 font-medium">${user.displayName}</span>
+                    `;
+                    onlineUsersList.appendChild(userElement);
+                });
+                
+                onlineUsersCount.textContent = `${onlineUsers.length} online`;
+            });
+        }
+        
+        // --- Room Management ---
+        newRoomForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const roomName = newRoomNameInput.value.trim().toLowerCase().replace(/\s+/g, '-');
+            if (roomName) {
+                const roomRef = doc(db, 'rooms', roomName);
+                try {
+                    await setDoc(roomRef, { 
+                        name: roomName,
+                        createdAt: serverTimestamp(),
+                        typing: []
+                    });
+                    newRoomNameInput.value = '';
+                    selectRoom(roomName);
+                } catch (error) {
+                    console.error("Error creating room: ", error);
+                }
+            }
+        });
+
+        function listenForRooms() {
+            const roomsCollection = collection(db, 'rooms');
+            onSnapshot(query(roomsCollection, orderBy('createdAt')), (snapshot) => {
+                roomsList.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const room = doc.data();
+                    const roomElement = document.createElement('div');
+                    roomElement.dataset.roomId = doc.id;
+                    roomElement.className = `p-2 my-1 rounded-md cursor-pointer hover:bg-gray-700 transition ${doc.id === currentRoomId ? 'bg-blue-600 font-semibold' : ''}`;
+                    roomElement.textContent = `# ${room.name}`;
+                    roomElement.addEventListener('click', () => selectRoom(doc.id));
+                    roomsList.appendChild(roomElement);
+                });
+            });
+        }
+        
+        async function selectRoom(roomId) {
+            if (currentRoomId === roomId) return;
+            
+            // Leave typing indicator from old room
+            if(currentUser){
+                 const oldRoomRef = doc(db, 'rooms', currentRoomId);
+                 await updateDoc(oldRoomRef, { typing: arrayRemove(currentUser.uid) });
+            }
+           
+            currentRoomId = roomId;
+
+            // Update UI for active room
+            document.querySelectorAll('#rooms-list > div').forEach(el => {
+                el.classList.toggle('bg-blue-600', el.dataset.roomId === roomId);
+                el.classList.toggle('font-semibold', el.dataset.roomId === roomId);
+            });
+            chatHeader.querySelector('h2').textContent = `# ${roomId}`;
+            
+            // Unsubscribe from old listeners
+            unsubscribeMessages();
+            unsubscribeRoomTyping();
+            
+            // Listen to new room
+            listenForMessages(roomId);
+            listenForTyping(roomId);
+        }
+
+        // --- Message Management ---
+        messageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageText = messageInput.value.trim();
+            if (messageText && currentUser) {
+                try {
+                    const messagesCollection = collection(db, 'rooms', currentRoomId, 'messages');
+                    await addDoc(messagesCollection, {
+                        text: messageText,
+                        senderId: currentUser.uid,
+                        senderName: currentUser.displayName,
+                        timestamp: serverTimestamp()
+                    });
+                    messageInput.value = '';
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                    // Stop typing indicator after sending
+                    clearTimeout(typingTimeout);
+                    const roomRef = doc(db, 'rooms', currentRoomId);
+                    await updateDoc(roomRef, { typing: arrayRemove(currentUser.uid) });
+
+                } catch (error) {
+                    console.error("Error sending message: ", error);
+                }
+            }
+        });
+
+        function listenForMessages(roomId) {
+            const messagesCollection = collection(db, 'rooms', roomId, 'messages');
+            const q = query(messagesCollection, orderBy('timestamp'));
+            
+            unsubscribeMessages = onSnapshot(q, (snapshot) => {
+                chatMessages.innerHTML = '';
+                snapshot.forEach(doc => {
+                    renderMessage(doc.data());
+                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        }
+
+        function renderMessage(message) {
+            const isMe = message.senderId === currentUser.uid;
+            const messageElement = document.createElement('div');
+            messageElement.className = `flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''}`;
+
+            const avatar = `<div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ${isMe ? 'bg-blue-500' : 'bg-gray-700'}">${message.senderName.charAt(0).toUpperCase()}</div>`;
+            
+            const bubble = `
+                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                    <div class="text-sm font-bold ${isMe ? 'text-blue-500' : 'text-gray-800'} mb-1">${message.senderName}</div>
+                    <div class="px-4 py-2 rounded-lg max-w-xs lg:max-w-md ${isMe ? 'chat-bubble-me' : 'chat-bubble-other'}">
+                        <p class="text-sm">${message.text}</p>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">
+                        ${message.timestamp ? new Date(message.timestamp.toDate()).toLocaleTimeString() : ''}
+                    </div>
+                </div>
+            `;
+            
+            messageElement.innerHTML = avatar + bubble;
+            chatMessages.appendChild(messageElement);
+        }
+
+        // --- Typing Indicator Logic ---
+        messageInput.addEventListener('input', async () => {
+            const roomRef = doc(db, 'rooms', currentRoomId);
+            if (!currentUser) return;
+
+            // Add user to typing array
+            updateDoc(roomRef, { typing: arrayUnion(currentUser.uid) });
+
+            // Set a timeout to remove the user after they stop typing
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(async () => {
+                await updateDoc(roomRef, { typing: arrayRemove(currentUser.uid) });
+            }, 2000); // 2 seconds
+        });
+        
+        function listenForTyping(roomId) {
+            const roomRef = doc(db, 'rooms', roomId);
+            unsubscribeRoomTyping = onSnapshot(roomRef, async (docSnap) => {
+                const roomData = docSnap.data();
+                if (!roomData || !currentUser) return;
+                
+                const typingUsers = roomData.typing || [];
+                // Filter out the current user
+                const otherTypingUsersIds = typingUsers.filter(uid => uid !== currentUser.uid);
+                
+                if (otherTypingUsersIds.length === 0) {
+                    typingIndicator.textContent = '';
+                    return;
+                }
+
+                // Fetch display names for typing users
+                const userNames = await Promise.all(
+                    otherTypingUsersIds.slice(0, 3).map(async (uid) => { // Limit to 3 names for display
+                        const userStatusRef = ref(rtdb, `/status/${uid}/displayName`);
+                        return new Promise(resolve => onValue(userStatusRef, (snap) => resolve(snap.val()), { onlyOnce: true }));
+                    })
+                );
+
+                const validNames = userNames.filter(Boolean);
+
+                if (validNames.length === 1) {
+                    typingIndicator.textContent = `${validNames[0]} is typing...`;
+                } else if (validNames.length === 2) {
+                    typingIndicator.textContent = `${validNames.join(' and ')} are typing...`;
+                } else if (validNames.length > 2) {
+                    typingIndicator.textContent = 'Several people are typing...';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
