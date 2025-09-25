@@ -1,88 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MERN Stack Real-Time Chat Application - README</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            background-color: #0d1117;
-            color: #c9d1d9;
-            margin: 0;
-            padding: 2rem;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 2rem;
-        }
-        h1, h2, h3 {
-            color: #ffffff;
-            border-bottom: 1px solid #30363d;
-            padding-bottom: 0.5rem;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-        }
-        h1 { font-size: 2em; }
-        h2 { font-size: 1.75em; }
-        h3 { font-size: 1.5em; }
-        p {
-            margin-bottom: 1rem;
-        }
-        a {
-            color: #58a6ff;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        ul {
-            list-style-type: disc;
-            padding-left: 2rem;
-        }
-        li {
-            margin-bottom: 0.5rem;
-        }
-        pre {
-            background-color: #0d1117;
-            padding: 1rem;
-            border-radius: 6px;
-            border: 1px solid #30363d;
-            overflow-x: auto;
-        }
-        code {
-            font-family: "SF Mono", "Consolas", "Liberation Mono", Menlo, Courier, monospace;
-            font-size: 0.9em;
-        }
-        strong {
-            color: #ffffff;
-        }
-        hr {
-            border: 0;
-            height: 1px;
-            background-color: #30363d;
-            margin: 2rem 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>MERN Stack Real-Time Chat Application</h1>
-        <p>A feature-rich, full-stack chat application built with the MERN stack (MongoDB, Express.js, React, Node.js) and Socket.IO for real-time communication. This project demonstrates a complete client-server architecture with user authentication, live messaging, and a modern, responsive user interface.</p>
-        <p><strong>Live Demo:</strong> <a href="https://your-frontend-url.vercel.app/"><strong>https://your-frontend-url.vercel.app/</strong></a></p>
+<h1>MERN Stack Real-Time Chat Application</h1>
+<p>A feature-rich, full-stack chat application built with the MERN stack (MongoDB, Express.js, React, Node.js) and Socket.IO for real-time communication. This project demonstrates a complete client-server architecture with user authentication, live messaging, and a modern, responsive user interface.</p>
+<p><strong>Live Demo:</strong> <a href="https://your-frontend-url.vercel.app/"><strong>https://your-frontend-url.vercel.app/</strong></a></p>
         
-        <hr>
+<hr>
+<h2>Screenshot & Demo</h2>
+        <p><em><img src="https://github.com/preesha73/Real-Time-ChatApp/blob/main/a.png" alt="Screenshot of the MERN Chat Application" class="screenshot"><br><br><img src="https://github.com/preesha73/Real-Time-ChatApp/blob/main/b.png" alt="Screenshot of the MERN Chat Application" class="screenshot"><br><br><img src="https://github.com/preesha73/Real-Time-ChatApp/blob/main/c.png" alt="Screenshot of the MERN Chat Application" class="screenshot"><br></em></p>
 
-        <h3>Screenshot & Demo</h3>
-        <p><em>(Here you can also add a short GIF showing the app in action. You can use a tool like Giphy Capture or ScreenToGif to record one.)</em></p>
-
-        <h2>Features</h2>
-        <ul>
+   <h2>Features</h2>
+       <ul>
             <li><strong>User Authentication:</strong> Secure user registration and login using JWT (JSON Web Tokens) and password hashing with bcrypt.</li>
             <li><strong>Real-Time Messaging:</strong> Instant message delivery and reception using WebSockets (Socket.IO).</li>
             <li><strong>Live Online User List:</strong> See who is currently connected to the application in real-time.</li>
@@ -92,10 +17,10 @@
             <li><strong>RESTful API:</strong> A well-structured backend API built with Express.js and Mongoose.</li>
         </ul>
 
-        <h2>Tech Stack</h2>
+   <h2>Tech Stack</h2>
         <h3>Frontend</h3>
         <ul>
-            <li>React.js</li>
+           <li>React.js</li>
             <li>Socket.IO Client</li>
             <li>Tailwind CSS</li>
             <li>Axios</li>
@@ -115,21 +40,21 @@
             <li>Frontend: Vercel</li>
             <li>Backend: Render</li>
             <li>Database: MongoDB Atlas</li>
-        </ul>
+       </ul>
 
-        <hr>
+   <hr>
 
-        <h2>How to Run Locally</h2>
+  <h2>How to Run Locally</h2>
         <p>To get a local copy up and running, follow these simple steps.</p>
 
-        <h3>Prerequisites</h3>
-        <ul>
+   <h3>Prerequisites</h3>
+       <ul>
             <li>Node.js installed</li>
             <li>npm (Node Package Manager)</li>
             <li>A MongoDB Atlas account and connection string</li>
         </ul>
 
-        <h3>Installation</h3>
+   <h3>Installation</h3>
         <ol>
             <li>
                 <p><strong>Clone the repo</strong></p>
