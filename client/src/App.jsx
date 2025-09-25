@@ -1,347 +1,316 @@
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import io from 'socket.io-client';
+import { io } from 'socket.io-client';
 
-// --- Configuration ---
-const SERVER_URL = 'http://localhost:5000';
-const socket = io(SERVER_URL);
+// --- Axios and Socket.IO Setup ---
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const socket = io(API_URL);
 
-// --- Authentication Context ---
-const AuthContext = createContext();
-
-const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(JSON.parse(localStorage.getItem('chat_user')));
-
-    const login = (userData) => {
-        localStorage.setItem('chat_user', JSON.stringify(userData));
-        setUser(userData);
-    };
-
-    const logout = () => {
-        localStorage.removeItem('chat_user');
-        setUser(null);
-        // Note: Disconnect logic should be handled where the socket connection is managed.
-    };
-
-    return (
-        <AuthContext.Provider value={{ user, login, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
-};
-
-const useAuth = () => useContext(AuthContext);
-
-// --- Main App Component ---
-export default function App() {
-    return (
-        <AuthProvider>
-            <Main />
-        </AuthProvider>
-    );
-}
-
-function Main() {
-    const { user } = useAuth();
-    return (
-        <div className="font-sans antialiased bg-gray-900 text-gray-200 h-screen w-screen">
-            {user ? <ChatPage /> : <AuthPage />}
-        </div>
-    );
-}
-
-
-// --- Authentication Page Component ---
-function AuthPage() {
-    const [isLogin, setIsLogin] = useState(true);
-    const { login } = useAuth();
-
-    const handleSubmit = async (e, username, password) => {
-        e.preventDefault();
-        const endpoint = isLogin ? '/api/login' : '/api/register';
-        try {
-            const res = await axios.post(`${SERVER_URL}${endpoint}`, { username, password });
-            if (isLogin) {
-                login({ username: res.data.username, userId: res.data.userId });
-            } else {
-                alert('Registration successful! Please log in.');
-                setIsLogin(true);
-            }
-        } catch (error) {
-            console.error("Auth error", error.response?.data?.msg || "An error occurred");
-            alert(error.response?.data?.msg || "An error occurred");
-        }
-    };
-
-    return (
-        <div className="flex items-center justify-center h-full">
-            <div className="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-sm">
-                <h1 className="text-3xl font-bold mb-6 text-center text-white">
-                    {isLogin ? 'Welcome Back' : 'Create Account'}
-                </h1>
-                <AuthForm isLogin={isLogin} onSubmit={handleSubmit} />
-                <button
-                    onClick={() => setIsLogin(!isLogin)}
-                    className="w-full text-center mt-4 text-blue-400 hover:underline"
-                >
-                    {isLogin ? 'Need an account? Register' : 'Have an account? Login'}
-                </button>
-            </div>
-        </div>
-    );
-}
-
-function AuthForm({ isLogin, onSubmit }) {
-    const [username, setUsername] = useState('');
+// --- Reusable Components ---
+const AuthForm = ({ isLogin, onSubmit, error, setError }) => {
+    const [displayName, setDisplayName] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!isLogin && password !== confirmPassword) {
+            setError("Passwords don't match!"); // Use state for errors instead of alert
+            return;
+        }
+        setError(''); // Clear previous errors
+        onSubmit({ displayName, password });
+    };
 
     return (
-        <form onSubmit={(e) => onSubmit(e, username, password)} className="space-y-4">
-            <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-            />
-            <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-            />
-            <button type="submit" className="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300">
-                {isLogin ? 'Login' : 'Register'}
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <h2 className="text-2xl font-bold text-center text-white">{isLogin ? 'Login' : 'Register'}</h2>
+            {!isLogin && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-300">Display Name</label>
+                    <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+            )}
+            <div>
+                <label className="block text-sm font-medium text-gray-300">Password</label>
+                <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder={isLogin ? "Enter your password" : ""}
+                />
+            </div>
+            {!isLogin && (
+                 <div>
+                    <label className="block text-sm font-medium text-gray-300">Confirm Password</label>
+                    <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+            )}
+            {error && <p className="text-sm text-center text-red-400">{error}</p>}
+            <button type="submit" className="w-full py-2 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500 transition-colors duration-300">
+                {isLogin ? 'Login' : 'Create Account'}
             </button>
         </form>
     );
-}
+};
 
+const AuthPage = ({ setAuthInfo }) => {
+    const [isLogin, setIsLogin] = useState(true);
+    const [error, setError] = useState('');
 
-// --- Chat Page Component ---
-function ChatPage() {
-    const [rooms] = useState(['general', 'tech', 'random']); // Static rooms for this example
-    const [currentRoom, setCurrentRoom] = useState('general');
-    const [onlineUsers, setOnlineUsers] = useState([]);
-    
-    const { user } = useAuth();
-    
-    useEffect(() => {
-        if(user) {
-            // Announce user is online
-            socket.emit('go-online', { userId: user.userId, username: user.username });
-
-            // Listen for the updated list of online users
-            socket.on('online-users', (users) => {
-                setOnlineUsers(users);
-            });
+    const handleAuth = async (credentials) => {
+        const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+        try {
+            // For a login attempt, we need the displayName from the credentials for the API
+            const authCredentials = isLogin 
+                ? { password: credentials.password } 
+                : credentials;
             
-            // Cleanup on component unmount
-            return () => {
-                socket.off('online-users');
-            };
+            if(isLogin) {
+                 const allUsers = await axios.get(`${API_URL}/api/auth/users`);
+                 const userExists = allUsers.data.find(u => u.displayName.toLowerCase() === credentials.displayName.toLowerCase());
+                 if(userExists) authCredentials.displayName = credentials.displayName;
+            }
+
+
+            const { data } = await axios.post(`${API_URL}${endpoint}`, authCredentials);
+            setAuthInfo({ token: data.token, user: data.user });
+            localStorage.setItem('chat-app-auth', JSON.stringify({ token: data.token, user: data.user }));
+        } catch (err) {
+            if (err.response) {
+                // The server responded with an error (e.g., wrong password)
+                setError(err.response.data.message || 'An unknown server error occurred.');
+            } else if (err.request) {
+                // The request was made but no response was received (server is likely down or asleep)
+                setError('Could not connect to the server. It might be waking up. Please try again in a minute.');
+            } else {
+                // Something else went wrong
+                setError('An error occurred while sending the request.');
+            }
         }
-    }, [user]);
+    };
 
     return (
-        <div className="grid grid-cols-12 h-screen w-screen">
-            <Sidebar rooms={rooms} setCurrentRoom={setCurrentRoom} currentRoom={currentRoom} />
-            <ChatArea room={currentRoom} />
-            <OnlineUsersPanel onlineUsers={onlineUsers} />
+        <div className="flex items-center justify-center min-h-screen bg-gray-900">
+            <div className="w-full max-w-md p-8 space-y-8 bg-gray-800 rounded-lg shadow-lg">
+                <div className="flex border-b border-gray-600">
+                    <button onClick={() => setIsLogin(true)} className={`flex-1 py-2 text-center font-medium ${isLogin ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}>Login</button>
+                    <button onClick={() => setIsLogin(false)} className={`flex-1 py-2 text-center font-medium ${!isLogin ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}>Register</button>
+                </div>
+                {/* We need to pass setError to the form now */}
+                <AuthForm isLogin={isLogin} onSubmit={handleAuth} error={error} setError={setError} />
+            </div>
         </div>
     );
-}
+};
 
-// --- Sidebar Component ---
-function Sidebar({ rooms, setCurrentRoom, currentRoom }) {
-    const { user, logout } = useAuth();
-    return (
-        <aside className="col-span-3 lg:col-span-2 bg-gray-800 flex flex-col justify-between">
-            <div>
-                <div className="p-4 border-b border-gray-700">
-                    <h2 className="text-xl font-bold text-white">Chat Rooms</h2>
-                </div>
-                <div className="p-2">
-                    {rooms.map(room => (
-                        <div
-                            key={room}
-                            onClick={() => setCurrentRoom(room)}
-                            className={`p-2 my-1 rounded-md cursor-pointer transition capitalize ${currentRoom === room ? 'bg-blue-600 font-semibold' : 'hover:bg-gray-700'}`}
-                        >
-                            # {room}
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div className="p-4 border-t border-gray-700 flex items-center space-x-3">
-                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white text-xl">
-                    {user.username.charAt(0).toUpperCase()}
-                 </div>
-                 <div>
-                    <p className="font-semibold text-white">{user.username}</p>
-                    <button onClick={logout} className="text-xs text-red-400 hover:underline">Logout</button>
-                 </div>
-            </div>
-        </aside>
-    );
-}
-
-// --- Chat Area Component ---
-function ChatArea({ room }) {
+const ChatPage = ({ authInfo, setAuthInfo }) => {
+    // This component's code remains the same as before
     const [messages, setMessages] = useState([]);
-    const [typingStatus, setTypingStatus] = useState('');
-    const { user } = useAuth();
-    const chatEndRef = useRef(null);
+    const [newMessage, setNewMessage] = useState('');
+    const [allUsers, setAllUsers] = useState([]);
+    const [onlineUserIds, setOnlineUserIds] = useState([]);
+    const [typingUsers, setTypingUsers] = useState({});
+    const messagesEndRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
 
+
+    // Effect for fetching initial data
     useEffect(() => {
-        // Fetch message history when room changes
-        axios.get(`${SERVER_URL}/api/messages/${room}`)
-            .then(res => setMessages(res.data))
-            .catch(err => console.error("Failed to fetch messages", err));
-
-        // Join socket room
-        socket.emit('join-room', room);
-
-        // Listen for new messages
-        const messageListener = (newMessage) => {
-            setMessages((prevMessages) => [...prevMessages, newMessage]);
+        const fetchMessages = async () => {
+            try {
+                const { data } = await axios.get(`${API_URL}/api/messages`, {
+                    headers: { Authorization: `Bearer ${authInfo.token}` }
+                });
+                setMessages(data);
+            } catch (error) {
+                console.error("Error fetching messages", error);
+            }
         };
-        socket.on('receive-message', messageListener);
+
+        const fetchUsers = async () => {
+             try {
+                const { data } = await axios.get(`${API_URL}/api/auth/users`, {
+                    headers: { Authorization: `Bearer ${authInfo.token}` }
+                });
+                setAllUsers(data);
+            } catch (error) {
+                console.error("Error fetching users", error);
+            }
+        }
+
+        fetchMessages();
+        fetchUsers();
+    }, [authInfo.token]);
+
+
+    // Effect for Socket.IO events
+    useEffect(() => {
+        socket.emit('user-online', authInfo.user.id);
+
+        socket.on('receive-message', (message) => {
+            setMessages(prevMessages => [...prevMessages, message]);
+            setTypingUsers(prev => {
+                const newTypingUsers = {...prev};
+                delete newTypingUsers[message.sender._id];
+                return newTypingUsers;
+            });
+        });
+
+        socket.on('update-online-users', (userIds) => {
+            setOnlineUserIds(userIds);
+        });
         
-        // Listen for typing status
-        const typingListener = (status) => setTypingStatus(status);
-        socket.on('typing', typingListener);
-        const stopTypingListener = () => setTypingStatus('');
-        socket.on('stop-typing', stopTypingListener);
+        socket.on('user-typing', (data) => {
+            setTypingUsers(prev => ({...prev, [data.userId]: data.displayName }));
+        });
 
-        // Cleanup: remove listeners when component unmounts or room changes
+        socket.on('user-stopped-typing', (data) => {
+            setTypingUsers(prev => {
+                const newTypingUsers = {...prev};
+                delete newTypingUsers[data.userId];
+                return newTypingUsers;
+            });
+        });
+
+
         return () => {
-            socket.off('receive-message', messageListener);
-            socket.off('typing', typingListener);
-            socket.off('stop-typing', stopTypingListener);
+            socket.off('receive-message');
+            socket.off('update-online-users');
+            socket.off('user-typing');
+            socket.off('user-stopped-typing');
         };
-    }, [room]);
-    
-    // Auto-scroll to the latest message
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [authInfo.user.id]);
+
+    // Effect for auto-scrolling
+     useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
-    
-    const handleSendMessage = (text) => {
-        if (text.trim()) {
-            socket.emit('send-message', { room, sender: user.userId, username: user.username, text });
-            socket.emit('stop-typing', room);
+
+
+    const handleSendMessage = (e) => {
+        e.preventDefault();
+        if (newMessage.trim()) {
+            const messageData = {
+                text: newMessage,
+                senderId: authInfo.user.id,
+            };
+            socket.emit('send-message', messageData);
+            socket.emit('stop-typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName });
+            if(typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            setNewMessage('');
         }
     };
     
-    return (
-        <main className="col-span-6 lg:col-span-7 bg-gray-900 flex flex-col h-screen">
-            <header className="p-4 border-b border-gray-700">
-                <h2 className="text-xl font-bold text-white capitalize"># {room}</h2>
-            </header>
-            <div className="flex-grow p-4 overflow-y-auto space-y-4">
-                {messages.map((msg, index) => <MessageBubble key={index} msg={msg} />)}
-                <div ref={chatEndRef} />
-            </div>
-            <div className="px-4 pb-2 text-sm text-gray-400 h-6">{typingStatus}</div>
-            <MessageInput onSendMessage={handleSendMessage} room={room} username={user.username} />
-        </main>
-    );
-}
-
-// --- Message Bubble Component ---
-function MessageBubble({ msg }) {
-    const { user } = useAuth();
-    const isMe = msg.sender === user.userId;
-    return (
-        <div className={`flex items-start gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ${isMe ? 'bg-blue-500' : 'bg-gray-700'}`}>
-                {msg.username.charAt(0).toUpperCase()}
-            </div>
-            <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                <div className={`text-sm font-bold ${isMe ? 'text-blue-400' : 'text-gray-300'} mb-1`}>
-                    {msg.username}
-                </div>
-                <div className={`px-4 py-2 rounded-lg max-w-xs lg:max-w-md ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-                    <p className="text-sm">{msg.text}</p>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// --- Message Input Component ---
-function MessageInput({ onSendMessage, room, username }) {
-    const [text, setText] = useState('');
-    const typingTimeoutRef = useRef(null);
-
     const handleTyping = (e) => {
-        setText(e.target.value);
+        setNewMessage(e.target.value);
+
+        if (!socket) return;
+        
         if (!typingTimeoutRef.current) {
-            socket.emit('typing', { room, username });
-        } else {
+             socket.emit('typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName });
+        }
+        
+        if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
         }
 
         typingTimeoutRef.current = setTimeout(() => {
-            socket.emit('stop-typing', room);
+            socket.emit('stop-typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName });
             typingTimeoutRef.current = null;
         }, 2000);
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onSendMessage(text);
-        setText('');
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
+    const handleLogout = () => {
+        localStorage.removeItem('chat-app-auth');
+        setAuthInfo(null);
     };
+    
+    const onlineUsersList = allUsers.filter(user => onlineUserIds.includes(user._id));
+
+    const typingIndicator = Object.values(typingUsers).join(', ');
 
     return (
-        <footer className="p-4 bg-gray-800 border-t border-gray-700">
-            <form onSubmit={handleSubmit} className="flex items-center space-x-3">
-                <input
-                    type="text"
-                    value={text}
-                    onChange={handleTyping}
-                    placeholder="Type a message..."
-                    className="w-full px-4 py-2 bg-gray-700 border-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    autoComplete="off"
-                />
-                <button type="submit" className="bg-blue-600 text-white font-semibold p-3 rounded-full hover:bg-blue-700 transition duration-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                </button>
-            </form>
-        </footer>
-    );
-}
-
-// --- Online Users Panel Component ---
-function OnlineUsersPanel({ onlineUsers }) {
-    return (
-        <aside className="hidden md:block md:col-span-3 lg:col-span-3 bg-gray-800 border-l border-gray-700 flex-col">
-            <div className="p-4 border-b border-gray-700">
-                <h2 className="text-xl font-bold text-white">Online ({onlineUsers.length})</h2>
+        <div className="flex h-screen bg-gray-900 text-white">
+            <div className="w-64 bg-gray-800 flex flex-col">
+                <div className="p-4 border-b border-gray-700"><h1 className="text-xl font-bold">MERN Chat</h1></div>
+                <div className="flex-1 p-4 space-y-2"><div className="px-3 py-2 bg-gray-700 rounded-md"># general</div></div>
+                <div className="p-4 border-t border-gray-700 flex items-center">
+                    <div className="flex-1"><p className="font-semibold">{authInfo.user.displayName}</p><p className="text-xs text-green-400">Online</p></div>
+                    <button onClick={handleLogout} className="px-3 py-1 text-sm bg-red-600 rounded hover:bg-red-700">Logout</button>
+                </div>
             </div>
-            <div className="p-4 space-y-3">
-                {onlineUsers.map(username => (
-                    <div key={username} className="flex items-center space-x-3">
-                        <div className="relative">
-                            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center font-bold text-white text-xl">
-                                {username.charAt(0).toUpperCase()}
+
+            <div className="flex-1 flex flex-col">
+                <div className="flex-1 p-6 overflow-y-auto">
+                     {messages.map(msg => (
+                        <div key={msg._id} className={`flex mb-4 ${msg.sender._id === authInfo.user.id ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`rounded-lg px-4 py-2 max-w-lg ${msg.sender._id === authInfo.user.id ? 'bg-blue-600' : 'bg-gray-700'}`}>
+                               <p className="text-sm font-bold text-gray-300">{msg.sender.displayName}</p>
+                                <p className="text-white">{msg.text}</p>
+                                <p className="text-xs text-right text-gray-400 mt-1">{new Date(msg.createdAt).toLocaleTimeString()}</p>
                             </div>
-                            <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-400 ring-2 ring-gray-800"></span>
                         </div>
-                        <span className="font-medium">{username}</span>
-                    </div>
-                ))}
+                    ))}
+                    <div ref={messagesEndRef} />
+                </div>
+                
+                <div className="h-6 px-6 text-sm text-gray-400 italic">
+                    {typingIndicator && `${typingIndicator} is typing...`}
+                </div>
+
+                <div className="p-6 bg-gray-800 border-t border-gray-700">
+                    <form onSubmit={handleSendMessage} className="flex">
+                        <input
+                            type="text"
+                            value={newMessage}
+                            onChange={handleTyping}
+                            placeholder="Type a message..."
+                            className="flex-1 px-4 py-2 text-white bg-gray-700 border border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button type="submit" className="px-6 py-2 font-semibold text-white bg-blue-600 rounded-r-md hover:bg-blue-700">Send</button>
+                    </form>
+                </div>
             </div>
-        </aside>
+            
+            <div className="w-64 bg-gray-800 border-l border-gray-700 p-4">
+                 <h2 className="text-lg font-bold mb-4">Online Users ({onlineUsersList.length})</h2>
+                 <ul className="space-y-3">
+                    {onlineUsersList.map(user => (
+                         <li key={user._id} className="flex items-center">
+                            <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
+                            <span>{user.displayName}</span>
+                        </li>
+                    ))}
+                 </ul>
+            </div>
+        </div>
     );
+};
+
+
+function App() {
+    const [authInfo, setAuthInfo] = useState(() => {
+        const savedAuth = localStorage.getItem('chat-app-auth');
+        return savedAuth ? JSON.parse(savedAuth) : null;
+    });
+
+    return authInfo ? <ChatPage authInfo={authInfo} setAuthInfo={setAuthInfo} /> : <AuthPage setAuthInfo={setAuthInfo} />;
 }
+
+export default App;
+
