@@ -25,18 +25,16 @@ const AuthForm = ({ isLogin, onSubmit, error, setError }) => {
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             <h2 className="text-2xl font-bold text-center text-white">{isLogin ? 'Login' : 'Register'}</h2>
-            {!isLogin && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-300">Display Name</label>
-                    <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        required
-                        className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-            )}
+            <div>
+                <label className="block text-sm font-medium text-gray-300">Display Name</label>
+                <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 mt-1 text-white bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
             <div>
                 <label className="block text-sm font-medium text-gray-300">Password</label>
                 <input
@@ -48,7 +46,7 @@ const AuthForm = ({ isLogin, onSubmit, error, setError }) => {
                     placeholder={isLogin ? "Enter your password" : ""}
                 />
             </div>
-            {!isLogin && (
+          {!isLogin && (
                  <div>
                     <label className="block text-sm font-medium text-gray-300">Confirm Password</label>
                     <input
@@ -120,6 +118,8 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
     const [allUsers, setAllUsers] = useState([]);
     const [onlineUserIds, setOnlineUserIds] = useState([]);
     const [typingUsers, setTypingUsers] = useState({});
+    const [rooms, setRooms] = useState(['general', 'random', 'support']);
+    const [activeRoom, setActiveRoom] = useState('general');
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
 
@@ -131,7 +131,8 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
                 const { data } = await axios.get(`${API_URL}/api/messages`, {
                     headers: { Authorization: `Bearer ${authInfo.token}` }
                 });
-                setMessages(data);
+                // filter messages for the active room
+                setMessages(data.filter(m => m.room === activeRoom));
             } catch (error) {
                 console.error("Error fetching messages", error);
             }
@@ -156,9 +157,14 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
     // Effect for Socket.IO events
     useEffect(() => {
         socket.emit('user-online', authInfo.user.id);
+        // join the active room
+        socket.emit('join-room', activeRoom);
 
         socket.on('receive-message', (message) => {
-            setMessages(prevMessages => [...prevMessages, message]);
+            // only append messages for the current active room
+            if (message.room === activeRoom) {
+                setMessages(prevMessages => [...prevMessages, message]);
+            }
             setTypingUsers(prev => {
                 const newTypingUsers = {...prev};
                 delete newTypingUsers[message.sender._id];
@@ -191,6 +197,22 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
         };
     }, [authInfo.user.id]);
 
+    // Rejoin new room and fetch messages when activeRoom changes
+    useEffect(() => {
+        socket.emit('join-room', activeRoom);
+        // fetch messages for the new room
+        (async () => {
+            try {
+                const { data } = await axios.get(`${API_URL}/api/messages`, {
+                    headers: { Authorization: `Bearer ${authInfo.token}` }
+                });
+                setMessages(data.filter(m => m.room === activeRoom));
+            } catch (err) {
+                console.error('Error fetching room messages', err);
+            }
+        })();
+    }, [activeRoom]);
+
     // Effect for auto-scrolling
      useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -203,6 +225,7 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
             const messageData = {
                 text: newMessage,
                 senderId: authInfo.user.id,
+                room: activeRoom,
             };
             socket.emit('send-message', messageData);
             socket.emit('stop-typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName });
@@ -217,7 +240,7 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
         if (!socket) return;
         
         if (!typingTimeoutRef.current) {
-             socket.emit('typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName });
+             socket.emit('typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName, room: activeRoom });
         }
         
         if (typingTimeoutRef.current) {
@@ -225,7 +248,7 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
         }
 
         typingTimeoutRef.current = setTimeout(() => {
-            socket.emit('stop-typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName });
+            socket.emit('stop-typing', { userId: authInfo.user.id, displayName: authInfo.user.displayName, room: activeRoom });
             typingTimeoutRef.current = null;
         }, 2000);
     };
@@ -243,7 +266,13 @@ const ChatPage = ({ authInfo, setAuthInfo }) => {
         <div className="flex h-screen bg-gray-900 text-white">
             <div className="w-64 bg-gray-800 flex flex-col">
                 <div className="p-4 border-b border-gray-700"><h1 className="text-xl font-bold">MERN Chat</h1></div>
-                <div className="flex-1 p-4 space-y-2"><div className="px-3 py-2 bg-gray-700 rounded-md"># general</div></div>
+                <div className="flex-1 p-4 space-y-2">
+                    {rooms.map(r => (
+                        <div key={r} onClick={() => setActiveRoom(r)} className={`px-3 py-2 rounded-md cursor-pointer ${r === activeRoom ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                            # {r}
+                        </div>
+                    ))}
+                </div>
                 <div className="p-4 border-t border-gray-700 flex items-center">
                     <div className="flex-1"><p className="font-semibold">{authInfo.user.displayName}</p><p className="text-xs text-green-400">Online</p></div>
                     <button onClick={handleLogout} className="px-3 py-1 text-sm bg-red-600 rounded hover:bg-red-700">Logout</button>

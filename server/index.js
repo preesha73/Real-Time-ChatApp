@@ -102,32 +102,46 @@ let onlineUsers = {};
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
-
+    // user-online: map userId to socketId and broadcast online users
     socket.on('user-online', (userId) => {
         onlineUsers[userId] = socket.id;
         io.emit('update-online-users', Object.keys(onlineUsers));
     });
 
+    // join-room: socket joins a specific room
+    socket.on('join-room', (room) => {
+        socket.join(room);
+        console.log(`Socket ${socket.id} joined room ${room}`);
+    });
+
+    // send-message: expects { room, senderId, text }
     socket.on('send-message', async (message) => {
         try {
+            if (!message.room) message.room = 'general';
             const newMessage = new Message({
+                room: message.room,
                 sender: message.senderId,
                 text: message.text,
             });
             await newMessage.save();
             const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'displayName');
-            io.emit('receive-message', populatedMessage);
+            // emit only to the room
+            io.to(message.room).emit('receive-message', populatedMessage);
         } catch (error) {
             console.error('Error saving or broadcasting message:', error);
         }
     });
 
+    // typing indicators scoped by room
     socket.on('typing', (data) => {
-        socket.broadcast.emit('user-typing', data);
+        // data: { room, userId, displayName }
+        const room = data.room || 'general';
+        socket.to(room).emit('user-typing', { userId: data.userId, displayName: data.displayName });
     });
 
     socket.on('stop-typing', (data) => {
-        socket.broadcast.emit('user-stopped-typing', data);
+        const room = data.room || 'general';
+        socket.to(room).emit('user-stopped-typing', { userId: data.userId });
     });
 
     socket.on('disconnect', () => {

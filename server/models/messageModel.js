@@ -10,18 +10,10 @@ const MessageSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    username: {
-        type: String,
-        required: true,
-    },
     text: {
         type: String,
         required: true,
     },
-    timestamp: {
-        type: Date,
-        default: Date.now,
-    },
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('Message', MessageSchema);
