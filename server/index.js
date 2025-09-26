@@ -17,20 +17,37 @@ const server = http.createServer(app);
 const FRONTEND_URL = process.env.FRONTEND_URL || '';
 const allowedOrigins = FRONTEND_URL ? FRONTEND_URL.split(',').map(u => u.trim()) : [];
 
-const corsOptions = {
-    origin: (origin, callback) => {
-        // allow non-browser requests (e.g., server-to-server or tools with no origin)
-        if (!origin) return callback(null, true);
-        // if no allowedOrigins configured, allow all origins (useful for quick dev)
-        if (allowedOrigins.length === 0) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error('Not allowed by CORS'), false);
-    },
-    methods: ["GET", "POST"],
-    credentials: true
-};
+// Custom CORS middleware to ensure a single Access-Control-Allow-Origin header
+// (browsers require the header to be a single origin or '*', not a comma-separated list)
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    // allow non-browser or server-to-server requests without origin
+    if (!origin) {
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET,POST');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (req.method === 'OPTIONS') return res.sendStatus(204);
+        return next();
+    }
 
-app.use(cors(corsOptions));
+    // if no allowedOrigins configured, allow all origins
+    if (allowedOrigins.length === 0) {
+        res.header('Access-Control-Allow-Origin', '*');
+    } else if (allowedOrigins.includes(origin)) {
+        // echo back the requesting origin (must be a single value)
+        res.header('Access-Control-Allow-Origin', origin);
+    } else {
+        // origin not allowed
+        return res.status(403).json({ message: 'CORS origin not allowed' });
+    }
+
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+});
 // --- End of CORS configuration ---
 
 app.use(express.json());
