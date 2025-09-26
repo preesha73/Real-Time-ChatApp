@@ -13,20 +13,32 @@ const app = express();
 const server = http.createServer(app);
 
 // --- CORS configuration (use FRONTEND_URL env var or fallback to allow all in dev) ---
+// FRONTEND_URL may be a single origin or a comma-separated list of origins.
 const FRONTEND_URL = process.env.FRONTEND_URL || '';
+const allowedOrigins = FRONTEND_URL ? FRONTEND_URL.split(',').map(u => u.trim()) : [];
+
 const corsOptions = {
-    origin: FRONTEND_URL || true,
+    origin: (origin, callback) => {
+        // allow non-browser requests (e.g., server-to-server or tools with no origin)
+        if (!origin) return callback(null, true);
+        // if no allowedOrigins configured, allow all origins (useful for quick dev)
+        if (allowedOrigins.length === 0) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'), false);
+    },
     methods: ["GET", "POST"],
     credentials: true
 };
+
 app.use(cors(corsOptions));
 // --- End of CORS configuration ---
 
 app.use(express.json());
 
+// Socket.IO CORS: if allowedOrigins provided use that array, otherwise allow all
 const io = new Server(server, {
     cors: {
-        origin: FRONTEND_URL || true,
+        origin: allowedOrigins.length ? allowedOrigins : true,
         methods: ["GET", "POST"]
     }
 });
