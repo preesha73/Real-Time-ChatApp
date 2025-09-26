@@ -12,9 +12,10 @@ const Message = require('./models/messageModel');
 const app = express();
 const server = http.createServer(app);
 
-// --- Add these lines for CORS configuration ---
+// --- CORS configuration (use FRONTEND_URL env var or fallback to allow all in dev) ---
+const FRONTEND_URL = process.env.FRONTEND_URL || '';
 const corsOptions = {
-    origin: "https://real-time-chat-app-ivory-six.vercel.app/", // IMPORTANT: Replace with your Vercel app's URL
+    origin: FRONTEND_URL || true,
     methods: ["GET", "POST"],
     credentials: true
 };
@@ -25,7 +26,7 @@ app.use(express.json());
 
 const io = new Server(server, {
     cors: {
-        origin: "https://your-frontend-url.vercel.app", // IMPORTANT: Also replace it here for Socket.IO
+        origin: FRONTEND_URL || true,
         methods: ["GET", "POST"]
     }
 });
@@ -84,3 +85,12 @@ io.on('connection', (socket) => {
         }
     });
 });  
+
+// --- Start server (bind to Render's provided PORT) ---
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+});
+
+// Helpful hint: allow configuring the allowed origin via FRONTEND_URL env var
+// (already used above for CORS/socket config). Example: FRONTEND_URL=https://your-frontend.com
