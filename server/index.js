@@ -66,6 +66,31 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('MongoDB connected...'))
     .catch(err => console.error('MongoDB connection error:', err));
 
+// --- Safe index migration ---
+// Drop legacy index on `username` (if it exists) and ensure a unique index on `displayName`.
+// This is defensive: it won't modify documents, only adjusts indexes to prevent E11000 on register.
+// We run this after connecting to Mongo so it runs once per process start.
+mongoose.connection.on('connected', async () => {
+    try {
+        const userCollection = mongoose.connection.collection('users');
+
+        // List indexes and drop the old username_1 if present
+        const indexes = await userCollection.indexes();
+        const hasUsernameIndex = indexes.some(ix => ix.name === 'username_1');
+        if (hasUsernameIndex) {
+            console.log('Dropping legacy index: username_1');
+            try { await userCollection.dropIndex('username_1'); } catch (dropErr) { console.warn('Failed to drop username_1 index:', dropErr.message || dropErr); }
+        }
+
+        // Ensure a unique index on displayName for current schema
+        // Use a partialFilterExpression to only index documents where displayName exists and is not null
+        console.log('Ensuring unique index on displayName');
+        await userCollection.createIndex({ displayName: 1 }, { unique: true, partialFilterExpression: { displayName: { $type: 'string' } } });
+    } catch (err) {
+        console.warn('Index migration warning:', err.message || err);
+    }
+});
+
 
 // --- API Routes ---
 app.use('/api/auth', authRoutes);
