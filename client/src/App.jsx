@@ -75,16 +75,11 @@ const AuthPage = ({ setAuthInfo }) => {
     const handleAuth = async (credentials) => {
         const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
         try {
-            // For a login attempt, we need the displayName from the credentials for the API
-            const authCredentials = isLogin 
-                ? { password: credentials.password } 
+            // For login, send both displayName and password directly to the login endpoint.
+            // (Don't call protected /api/auth/users without a token — that caused the 401 error.)
+            const authCredentials = isLogin
+                ? { displayName: credentials.displayName, password: credentials.password }
                 : credentials;
-            
-            if(isLogin) {
-                 const allUsers = await axios.get(`${API_URL}/api/auth/users`);
-                 const userExists = allUsers.data.find(u => u.displayName.toLowerCase() === credentials.displayName.toLowerCase());
-                 if(userExists) authCredentials.displayName = credentials.displayName;
-            }
 
 
             const { data } = await axios.post(`${API_URL}${endpoint}`, authCredentials);
